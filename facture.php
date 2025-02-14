@@ -5,7 +5,7 @@ require 'vendor/autoload.php';
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-$key = "secret_key";
+$key = "my_key";
 
 header("Content-Type: application/json");
 
@@ -28,10 +28,11 @@ try {
     $data = json_decode(file_get_contents("php://input"), true);
     $id_client = $data['id_client'];
     $produits = $data['produits'];
-    $etat = $data['etat'];
-    $methode_paiement=$data['methode_paiement'];
-
+    $etat = $data['etat'] ?? 'en attente';
+    $methode_paiement=$data['methode_paiement'] ?? 'espèces';
     $date_echeance = $data['date_echeance'];
+
+    echo "etat" . $etat;
     
     $montant_total = 0;
     foreach ($produits as $produit) {
@@ -44,12 +45,27 @@ try {
         }
     }
 
-    $stmt = $pdo->prepare("INSERT INTO facture (id_client, id_utilisateur, montant, etat, methode_paiement, date_creation, date_echeance) 
-                            VALUES (?, ?, ?, ?, ?, NOW(), ?)");
-    $stmt->execute([$id_client, $id_utilisateur, $montant_total, $etat, $methode_paiement, $date_echeance]);
-      
-        echo json_encode(["message" => "Facture créée"]);
-    
+    $stmt = $pdo->prepare("INSERT INTO facture (id_client, id_utilisateur, montant, etat, methode_paiement, date_echeance) 
+                            VALUES (:idClient, :idUser, :montant, :etat, :methodPaiement, :date_echeance) ");
+
+$stmt->bindParam(":idClient", $id_client, PDO::PARAM_INT);
+$stmt->bindParam(":idUser", $id_utilisateur, PDO::PARAM_INT);
+$stmt->bindParam(":montant", $montant_total, PDO::PARAM_STR);
+$stmt->bindParam(":etat", $etat, PDO::PARAM_STR);
+$stmt->bindParam(":methodPaiement", $methode_paiement, PDO::PARAM_STR);
+$stmt->bindParam(":date_echeance", $date_echeance, PDO::PARAM_STR);
+    if ($stmt->execute()) {
+        $last_id = $pdo->lastInsertId();
+        $stmt = $pdo->prepare("SELECT * FROM facture WHERE num_facture= ?");
+        $stmt->execute([$last_id]);
+        $facture = $stmt->fetch(PDO::FETCH_ASSOC);
+        echo json_encode([
+            "message" => "Facture créée",
+            "facture" => $facture
+        ]);
+    }else{
+        echo json_encode(["error"=>"erreur lors de l'insertion des données","details"=>$stmt->errorInfo()]);
+    } ;
 } catch (Exception $e) {
     die(json_encode(["error" => "Token invalide", "details" => $e->getMessage()]));
 }
