@@ -1,4 +1,6 @@
 <?php 
+require 'authorisation.php';
+verificationRole('administrateur');
 if($_SERVER["REQUEST_METHOD"]=="POST"){
     require 'db.php';
     

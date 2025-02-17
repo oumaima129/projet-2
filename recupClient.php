@@ -1,4 +1,6 @@
 <<?php
+require 'authorisation.php';
+verificationRole('administrateur');
 require 'db.php'; 
 
 header('Content-Type: application/json');
