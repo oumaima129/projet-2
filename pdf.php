@@ -25,29 +25,28 @@ $pdf->SetTextColor(0);
 if (!isset($_GET['num_facture']) || empty($_GET['num_facture'])) {
     die("num de facture invalide.");
 }
-$id_facture = $_GET['num_facture'];
+$num_facture = $_GET['num_facture'];
 $query = "SELECT c.nom, c.prenom, c.adresse, c.telephone, 
-                 f.numero, f.date_creation, f.date_echeance, f.methode_paiement 
+                 f.num_facture, f.date_creation, f.date_echeance, f.methode_paiement 
           FROM facture f 
-          JOIN clients c ON f.id_client = c.id 
-          WHERE f.num_facture= :num_facture";
-$stmt = $db->prepare($query);
+          JOIN client c ON f.id_client = c.id_client
+          WHERE f.num_facture = :num_facture";
+$stmt = $pdo->prepare($query);
 $stmt->bindParam(':num_facture', $num_facture, PDO::PARAM_INT);
 $stmt->execute();
 $facture = $stmt->fetch(PDO::FETCH_ASSOC);
+
 if (!$facture) {
     die("Facture introuvable.");
 }
 
-$pdf->Text(8, 38, 'Nom et Prénom du client: ' . utf8_decode($facture['nom'] . ' ' . $facture['prenom']));
-$pdf->Text(8, 43, 'Adresse: ' . utf8_decode($facture['adresse']));
-$pdf->Text(8, 48, 'Téléphone: ' . $facture['telephone']);
-
-
-$pdf->Text(120, 48, 'Numéro de facture: ' . $facture['numero']);
-$pdf->Text(120, 53, 'Date de création: ' . $facture['date_creation']);
-$pdf->Text(120, 58, 'Date échéance: ' . $facture['date_echeance']);
-$pdf->Text(120, 63, 'Méthode de paiement: ' . utf8_decode($facture['methode_paiement']));
+$pdf->Text(8, 38, 'Nom et Prenom du client: ' . mb_convert_encoding($facture['nom'] . ' ' . $facture['prenom'], 'ISO-8859-1', 'UTF-8'));
+$pdf->Text(8, 43, 'Adresse: ' . mb_convert_encoding($facture['adresse'], 'ISO-8859-1', 'UTF-8'));
+$pdf->Text(8, 48, 'Telephone: ' . $facture['telephone']);
+$pdf->Text(120, 48, 'Numero de facture: ' . $facture['num_facture']);
+$pdf->Text(120, 53, 'Date de creation: ' . $facture['date_creation']);
+$pdf->Text(120, 58, 'Date echeance: ' . $facture['date_echeance']);
+$pdf->Text(120, 63, 'Methode de paiement: ' . mb_convert_encoding($facture['methode_paiement'], 'ISO-8859-1', 'UTF-8'));
 
 $position_entete = 78;
 function entete_table($position_entete) {
@@ -57,27 +56,33 @@ function entete_table($position_entete) {
     $pdf->SetTextColor(0);
     $pdf->SetY($position_entete);
     $pdf->SetX(8);
-
-    $pdf->Cell(112, 8, 'Nom du produit', 1, 0, 'L', 1);
-    $pdf->Cell(24, 8, 'Quantité', 1, 0, 'C', 1);
-    $pdf->Cell(24, 8, 'Prix unitaire', 1, 0, 'C', 1);
-    $pdf->Cell(24, 8, 'Total', 1, 1, 'C', 1);
+    $w1 = 112; 
+    $w2 = 24;  
+    $w3 = 24;  
+    $w4 = 24;  
+    $pdf->Cell($w1, 8, 'Nom du produit', 1, 0, 'L', 1);
+    $pdf->Cell($w2, 8, 'Quantite', 1, 0, 'C', 1);
+    $pdf->Cell($w3, 8, 'Prix unitaire', 1, 0, 'C', 1);
+    $pdf->Cell($w4, 8, 'Total', 1, 1, 'C', 1);
 }
 entete_table($position_entete);
+
 $query_produits = "SELECT p.nom, fp.quantite, fp.prix_unitaire 
-                   FROM produits p 
-                   JOIN produits p ON fp.id_produit = p.id 
-                   WHERE p.num__facture = :num_facture";
-$stmt = $db->prepare($query_produits);
-$stmt->bindParam(':id_facture', $id_facture, PDO::PARAM_INT);
+                   FROM facture_produit fp 
+                   JOIN produits p ON fp.id_produit = p.id_produit
+                   WHERE fp.num_facture = :num_facture";
+$stmt = $pdo->prepare($query_produits);
+$stmt->bindParam(':num_facture', $num_facture, PDO::PARAM_INT);
 $stmt->execute();
 $produits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+if (empty($produits)) {
+    die("Aucun produit trouve pour cette facture.");
+}
+
 $hauteur_ligne = 8;
 $total_lignes = count($produits) + 1; 
 $hauteur_totale = $total_lignes * $hauteur_ligne;
-
-$pdf->Rect(8, $position_entete, 184, $hauteur_totale);
-
 $pdf->SetFont('Arial', '', 12);
 $pdf->SetY($position_entete + 8);
 $pdf->SetX(8);
@@ -86,18 +91,24 @@ $total_facture = 0;
 foreach ($produits as $produit) {
     $total_produit = $produit['quantite'] * $produit['prix_unitaire'];
     $total_facture += $total_produit;
-
-    $pdf->Cell(112, 8, utf8_decode($produit['nom']), 1, 0, 'L');  
-    $pdf->Cell(24, 8, $produit['quantite'], 1, 0, 'C');  
-    $pdf->Cell(24, 8, number_format($produit['prix_unitaire'], 2) . '€', 1, 0, 'C');   
-    $pdf->Cell(24, 8, number_format($total_produit, 2) . '€', 1, 1, 'C');  
+    $y_position=$pdf->GetY();
+    $pdf->SetX(8);
+    $pdf->MultiCell(112,8,mb_convert_encoding($produit['nom'],'ISO-8859-1','UTF-8'),1,'L');
+    $ligne_height=$pdf->GetY() -$y_position;
+    $pdf->SetY($y_position);
+    $pdf->SetX(120); 
+    $pdf->Cell(24, $ligne_height, $produit['quantite'], 1, 0, 'C');  
+    $pdf->Cell(24, $ligne_height, number_format($produit['prix_unitaire'], 2) . 'dh', 1, 0, 'C');   
+    $pdf->Cell(24, $ligne_height, number_format($total_produit, 2) . 'dh', 1, 1, 'C');  
 }
-
+$pdf->Rect(8, $position_entete, 184, $pdf->GetY() -$position_entete);
+$y_position_total = $pdf->GetY();
+$ligne_height_total = 8; 
 $pdf->SetFont('Arial', 'B', 12);
-$pdf->Cell(160, 8, 'Total Facture', 1, 0, 'R', 1);
-$pdf->Cell(24, 8, number_format($total_facture, 2) . '€', 1, 1, 'C', 1);
-
-$pdf->Output('F', 'facture_test.pdf'); 
-echo "PDF généré avec succès : facture_test.pdf";
-
+$pdf->SetX(8);
+$pdf->Cell(112 + 24 + 24, $ligne_height_total, 'Total Facture', 1, 0, 'R', 1);
+$pdf->Cell(24, $ligne_height_total, number_format($total_facture, 2) . 'dh', 1, 1, 'C', 1);
+header('Content-Type: application/pdf');
+header('Content-Disposition: attachment; filename="facture_' . $num_facture . '.pdf"');
+$pdf->Output('D'); 
 ?>
