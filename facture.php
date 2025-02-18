@@ -50,7 +50,7 @@ try {
         }
 
         $stmt = $pdo->prepare("INSERT INTO facture (id_client, id_utilisateur, montant, etat, methode_paiement, date_echeance) 
-                                VALUES (?, ?, ?, ?, ?, ?)");
+                                VALUES (:id_client, :id_utilisateur, : montant, :etat, :methode_paiement, :date_echeance)");
         if ($stmt->execute([$id_client, $id_utilisateur, $montant_total, $etat, $methode_paiement, $date_echeance])) {
             $last_id = $pdo->lastInsertId();
             $stmt = $pdo->prepare("SELECT * FROM facture WHERE num_facture= ?");

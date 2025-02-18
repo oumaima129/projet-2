@@ -3,7 +3,6 @@ require 'authorisation.php';
 verificationRole('administrateur');
 if($_SERVER["REQUEST_METHOD"]=="POST"){
     require 'db.php';
-    
     $nom = htmlspecialchars($_POST['nom']);
     $prenom = htmlspecialchars($_POST['prenom']);
     $email = filter_var($_POST['email'], FILTER_SANITIZE_EMAIL);
@@ -15,7 +14,7 @@ if($_SERVER["REQUEST_METHOD"]=="POST"){
     } else {
         try {
   
-            $sql = $pdo->prepare("INSERT INTO client (nom, prenom, email, telephone, adresse) VALUES (?, ?, ?, ?, ?)");
+            $sql = $pdo->prepare("INSERT INTO client (nom, prenom, email, telephone, adresse) VALUES (:nom, :prenom, :email, :telephone, :adresse)");
             $sql->execute([$nom, $prenom, $email, $telephone, $adresse]);
             echo "Client ajouté avec succès";
         } catch (PDOException $e) {

@@ -1,41 +1,32 @@
 <?php
-require 'db.php'; // Connexion à la base de données
-
+require 'db.php'; 
 header("Content-Type: application/json");
-
 try {
-    // 🔹 Lire les données envoyées en JSON (depuis Postman)
     $data = json_decode(file_get_contents("php://input"), true);
-
-    // 🔹 Vérifier les données
     if (!isset($data["num_facture"]) || !isset($data["produits"])) {
         echo json_encode(["status" => "error", "message" => "Données incomplètes"]);
         exit;
     }
 
     $num_facture = $data["num_facture"];
-    $produits = $data["produits"]; // Liste des produits envoyée en JSON
+    $produits = $data["produits"];
+    $sql_facture = "SELECT num_facture FROM facture WHERE num_facture = :num_facture";
+    $stmt_facture = $pdo->prepare($sql_facture);
+    $stmt_facture->bindParam(":num_facture", $num_facture, PDO::PARAM_INT);
+    $stmt_facture->execute();
 
-    // 🔹 Vérifier si la facture existe
-    $query_check_facture = "SELECT num_facture FROM facture WHERE num_facture = :num_facture";
-    $stmt_check_facture = $pdo->prepare($query_check_facture);
-    $stmt_check_facture->bindParam(":num_facture", $num_facture, PDO::PARAM_INT);
-    $stmt_check_facture->execute();
-
-    if ($stmt_check_facture->rowCount() === 0) {
+    if ($stmt_facture->rowCount() === 0) {
         echo json_encode(["status" => "error", "message" => "Facture introuvable"]);
         exit;
     }
 
-    // 🔹 Insérer chaque produit dans la table `facture_produit`
-    $query_insert = "INSERT INTO facture_produit (num_facture, id_produit, quantite, prix_unitaire) 
+    $sql_insert = "INSERT INTO facture_produit (num_facture, id_produit, quantite, prix_unitaire) 
                      VALUES (:num_facture, :id_produit, :quantite, :prix_unitaire)";
-    $stmt_insert = $pdo->prepare($query_insert);
+    $stmt_insert = $pdo->prepare($sql_insert);
 
     foreach ($produits as $produit) {
-        // Vérifier si le produit existe et récupérer son prix
-        $query_produit = "SELECT prix_unitaire FROM produits WHERE id_produit = :id_produit";
-        $stmt_produit = $pdo->prepare($query_produit);
+        $sql_produit = "SELECT prix_unitaire FROM produits WHERE id_produit = :id_produit";
+        $stmt_produit = $pdo->prepare($sql_produit);
         $stmt_produit->bindParam(":id_produit", $produit["id_produit"], PDO::PARAM_INT);
         $stmt_produit->execute();
         $produit_info = $stmt_produit->fetch(PDO::FETCH_ASSOC);
@@ -47,8 +38,6 @@ try {
 
         $prix_unitaire = $produit_info["prix_unitaire"];
         $quantite = $produit["quantite"];
-
-        // 🔹 Insérer dans `facture_produit`
         $stmt_insert->bindParam(":num_facture", $num_facture, PDO::PARAM_INT);
         $stmt_insert->bindParam(":id_produit", $produit["id_produit"], PDO::PARAM_INT);
         $stmt_insert->bindParam(":quantite", $quantite, PDO::PARAM_INT);

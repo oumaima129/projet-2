@@ -91,6 +91,7 @@ $total_facture = 0;
 foreach ($produits as $produit) {
     $total_produit = $produit['quantite'] * $produit['prix_unitaire'];
     $total_facture += $total_produit;
+    
     $y_position=$pdf->GetY();
     $pdf->SetX(8);
     $pdf->MultiCell(112,8,mb_convert_encoding($produit['nom'],'ISO-8859-1','UTF-8'),1,'L');
